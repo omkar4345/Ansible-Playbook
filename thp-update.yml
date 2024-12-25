@@ -1,0 +1,34 @@
+---
+- hosts: thp-update
+
+#  tasks:
+#    - name:  disable Transparent HugePages on target servers
+#      copy:
+#        src: files/thp-update.txt
+#        dest: /tmp
+#        mode: 0755
+#
+#    - name: update thp settings in /etc/rc.local files
+#      shell: cat /tmp/thp-update.txt >> /etc/rc.local
+#
+#    - name: disable Transparent HugePages
+#      shell: echo never > /sys/kernel/mm/transparent_hugepage/enabled
+#
+#    - name: disable Transparent HugePages
+#      shell: echo never > /sys/kernel/mm/transparent_hugepage/defrag
+
+  tasks:
+    - name:  copy Transparent HugePages service on target servers
+      copy:
+        src: files/disable-thp.service
+        dest: /etc/systemd/system/
+        mode: 0644
+
+    - name: refresh all services
+      shell: systemctl daemon-reload
+
+    - name: start Transparent HugePages service
+      shell: systemctl start disable-thp
+
+    - name: enable Transparent HugePages service
+      shell: systemctl enable disable-thp

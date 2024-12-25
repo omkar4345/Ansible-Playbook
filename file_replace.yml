@@ -1,0 +1,9 @@
+---
+ - hosts: OEL-templates
+
+   tasks:
+   - name: copy file from local host to remote host (absolute path) files/oracle.repo
+     copy:
+       src: files/oracle.repo
+       dest: /etc/yum.repos.d/
+       mode: 0644

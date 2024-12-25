@@ -1,0 +1,15 @@
+---
+ - hosts: TAMER
+
+   tasks:
+   - name: copy file from local host to remote host (absolute path) files/SensorLinuxInstaller-MHE
+     copy:
+       src: files/SensorLinuxInstaller-MHE
+       dest: /tmp/
+       mode: 0755
+   - name: copy file from local host to remote host (absolute path) files/SensorLinuxInstaller-MHE.cfg
+     copy:
+       src: files/SensorLinuxInstaller-MHE.cfg
+       dest: /tmp/
+       mode: 0755
+

@@ -1,0 +1,12 @@
+---
+- hosts: DCPNESSUSVS01
+
+  tasks:
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index1.secedu.qa:9997 -auth t-o.sawant-admin@education.qa:vuzinqIZD
+
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index2.secedu.qa:9997 -auth t-o.sawant-admin@education.qa:vuzinqIZD
+
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index3.secedu.qa:9997 -auth t-o.sawant-admin@education.qa:vuzinqIZD

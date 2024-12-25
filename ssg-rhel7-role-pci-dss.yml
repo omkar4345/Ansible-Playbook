@@ -1,0 +1,268 @@
+---
+ - hosts: localhost # set required host
+   tasks:
+
+    - name: "Read permission of GPG key directory"
+      stat:
+        path: /etc/pki/rpm-gpg/
+      register: gpg_key_directory_permission
+      check_mode: no
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    # It should fail if it doesn't find any fingerprints in file - maybe file was not parsed well.
+    - name: "Read signatures in GPG key"
+      shell: "gpg --with-fingerprint '/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release' | grep 'Key fingerprint =' | tr -s ' ' | sed 's;.*= ;;g'"
+      changed_when: False
+      register: gpg_fingerprints
+      check_mode: no
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    - name: "Set Fact: Valid fingerprints"
+      set_fact:
+         gpg_valid_fingerprints: ("567E 347A D004 4ADE 55BA 8A5F 199E 2F91 FD43 1D51" "43A6 E49C 4A38 F4BE 9ABF 2A53 4568 9C88 2FA6 58E0")
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    - name: "Import RedHat GPG key"
+      rpm_key:
+        state: present
+        key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      when:
+        (gpg_key_directory_permission.stat.mode <= '0755')
+        and (( gpg_fingerprints.stdout_lines | difference(gpg_valid_fingerprints)) | length == 0)
+        and (gpg_fingerprints.stdout_lines | length > 0)
+        and (ansible_distribution == "RedHat")
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+
+    - name: "Check existence of yum on Fedora"
+      stat:
+        path: /etc/yum.conf
+      register: yum_config_file
+      check_mode: no
+      when: ansible_distribution == "Fedora"
+    # Old versions of Fedora use yum
+    - name: "Ensure GPG check is globally activated (yum)"
+      ini_file:
+        dest: "{{item}}"
+        section: main
+        option: gpgcheck
+        value: 1
+        create: False
+      with_items: "/etc/yum.conf"
+      when: ansible_distribution == "RedHat" or yum_config_file.stat.exists
+      tags:
+        - ensure_gpgcheck_globally_activated
+        - high
+        - CCE-26989-4
+    - name: "Ensure GPG check is globally activated (dnf)"
+      ini_file:
+        dest: "{{item}}"
+        section: main
+        option: gpgcheck
+        value: 1
+        create: False
+      with_items: "/etc/dnf/dnf.conf"
+      when: ansible_distribution == "Fedora"
+      tags:
+        - ensure_gpgcheck_globally_activated
+        - high
+        - CCE-26989-4
+
+    - name: "Ensure aide is installed"
+      package:
+        name="{{item}}"
+        state=present
+      with_items:
+        - aide
+      tags:
+        - package_aide_installed
+        - medium
+        - CCE-27096-7
+
+    - name: "Build and Test AIDE Database"
+      shell: /usr/sbin/aide --init
+      tags:
+        - aide_build_database
+        - medium
+        - CCE-27220-3
+    - name: Stage AIDE Database"
+      copy:
+        src: /var/lib/aide/aide.db.new.gz
+        dest: /var/lib/aide/aide.db.gz
+        backup: yes
+      tags:
+        - aide_build_database
+        - medium
+        - CCE-27220-3
+
+    - name: "Read list of files with incorrect permissions"
+      shell: "rpm -Va | grep '^.M' | sed -r 's;^.*\\s+(.+);\\1;g'"
+      register: files_with_incorrect_permissions
+      failed_when: False
+      changed_when: False
+      check_mode: no
+      tags:
+        - rpm_verify_permissions
+        - high
+        - CCE-27209-6
+    - name: "Correct file permissions with RPM"
+      shell: "rpm --setperms $(rpm -qf '{{item}}')"
+      with_items: "{{ files_with_incorrect_permissions.stdout_lines }}"
+      when: files_with_incorrect_permissions.stdout_lines | length > 0
+      tags:
+        - rpm_verify_permissions
+        - high
+        - CCE-27209-6
+
+    - name: "Set fact: Package manager reinstall command (dnf)"
+      set_fact:
+        package_manager_reinstall_cmd: dnf reinstall -y
+      when: ansible_distribution == "Fedora"
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+    - name: "Set fact: Package manager reinstall command (yum)"
+      set_fact:
+        package_manager_reinstall_cmd: yum reinstall -y
+      when: ansible_distribution == "RedHat"
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+    - name: "Read files with incorrect hash"
+      shell: "rpm -Va | grep -E '^..5.* /(bin|sbin|lib|lib64|usr)/' | sed -r 's;^.*\\s+(.+);\\1;g'"
+      register: files_with_incorrect_hash
+      changed_when: False
+      when: package_manager_reinstall_cmd is defined
+      check_mode: no
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+    - name: "Reinstall packages of files with incorrect hash"
+      shell: "{{package_manager_reinstall_cmd}} $(rpm -qf '{{item}}')"
+      with_items: "{{ files_with_incorrect_hash.stdout_lines }}"
+      when: package_manager_reinstall_cmd is defined and (files_with_incorrect_hash.stdout_lines | length > 0)
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+
+    - name: "Ensure permission 0000 on /etc/shadow"
+      file:
+        path="{{item}}"
+        mode=0000
+      with_items:
+        - /etc/shadow
+      tags:
+        - file_permissions_etc_shadow
+        - medium
+        - CCE-27100-7
+
+    - name: "Prevent Log In to Accounts With Empty Password"
+      replace:
+        dest: /etc/pam.d/system-auth
+        regexp: 'nullok\s*'
+        replace: ''
+      tags:
+        - no_empty_passwords
+        - high
+        - CCE-27286-4
+
+    - name: "Disable POST password expiration"
+      lineinfile:
+        create=yes
+        dest="/etc/default/useradd"
+        regexp="^INACTIVE"
+        line="INACTIVE=-1"
+      tags:
+        - account_disable_post_pw_expiration
+        - medium
+        - CCE-27355-7
+
+    - name: "Ensure PAM variable dcredit is set to -1"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^dcredit"
+        line="dcredit = -1"
+      tags:
+        - accounts_password_pam_dcredit
+        - medium
+        - CCE-27214-6
+
+    - name: "Ensure PAM variable minlen is set to 7"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^minlen"
+        line="minlen = 7"
+      tags:
+        - accounts_password_pam_minlen
+        - medium
+        - CCE-27293-0
+
+    - name: "Ensure PAM variable ucredit is set to -1"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^ucredit"
+        line="ucredit = -1"
+      tags:
+        - accounts_password_pam_ucredit
+        - medium
+        - CCE-27200-5
+
+    - name: "Ensure PAM variable lcredit is set to -1"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^lcredit"
+        line="lcredit = -1"
+      tags:
+        - accounts_password_pam_lcredit
+        - medium
+        - CCE-27345-8
+
+    - name: "Ensure libreswan is installed"
+      package:
+        name="{{item}}"
+        state=present
+      with_items:
+        - libreswan
+      tags:
+        - package_libreswan_installed
+        - medium
+        - CCE-80170-4
+
+    - name: "Enable service auditd"
+      service:
+        name="{{item}}"
+        enabled="yes"
+        state="started"
+      with_items:
+        - auditd
+      tags:
+        - service_auditd_enabled
+        - high
+        - CCE-27407-6
+
+    - name: "Set SSH Idle Timeout Interval"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^ClientAliveInterval"
+        line="ClientAliveInterval 900"
+      tags:
+        - sshd_set_idle_timeout
+        - low
+        - CCE-27433-2

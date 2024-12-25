@@ -1,0 +1,23 @@
+---
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index1.secedu.qa:9997
+      become: yes
+      become_method: su
+      become_user: "{{ os_user }}"
+
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index2.secedu.qa:9997
+      become: yes
+
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index3.secedu.qa:9997
+      become: yes
+
+    - name: path which need to be monitored
+      shell: /opt/splunkforwarder/bin/splunk add monitor /var/log/ -index main -sourcetype %ALL%
+
+    - name: -initd- Restart Splunk UF
+      command: "{{ splunk_uf_home }}/bin/splunk restart"
+      become: yes
+      become_method: su
+      become_user: "{{ os_user }}"

@@ -1,0 +1,36 @@
+---
+- hosts: splk-test-env-splk-frwdr
+
+
+  tasks:
+    - name: remove SPLUNK_FORWARDER package from the server
+      yum:
+        name: splunkforwarder
+        state: removed
+
+    - name: copying SPLUNK_FORWARDER rpm file from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/splunkforwarder-8.0.1-6db836e2fb9e-linux-2.6-x86_64.rpm
+        dest: /tmp/splunkforwarder-8.0.1-6db836e2fb9e-linux-2.6-x86_64.rpm
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: copying install script file for SPLUNK_FORWARDER from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/splunkFWDR_install.sh
+        dest: /tmp/splunkFWDR_install.sh
+        owner: root
+        group: root
+        mode: 0755
+
+#    - name: splunk user create for splunk UF
+#      user:
+#        name: splunk
+#        comment: "splunk ID for splunk-forwarder"
+
+
+    - name: install SPLUNK_FORWARDER package on the servers
+      yum:
+        name: /tmp/splunkforwarder-8.0.1-6db836e2fb9e-linux-2.6-x86_64.rpm
+        state: present

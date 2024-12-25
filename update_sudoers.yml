@@ -1,0 +1,12 @@
+---
+- hosts: splk-test-env
+
+  tasks:
+    - name: copy AD Group details on target servers
+      copy:
+        src: files/sudo_entry.txt
+        dest: /tmp
+        mode: 0755
+
+    - name: Add grp names in /etc/sudoers files
+      shell: cat /tmp/sudo_entry.txt >> /etc/sudoers

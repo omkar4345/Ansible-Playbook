@@ -1,0 +1,9 @@
+---
+- hosts: MY_SERVERS
+
+  tasks:
+    # OS version check task
+    - name:  OS version check
+      shell: cat /etc/*release
+#      ignore_errors: true
+#      register: /tmp/OS_version_detail

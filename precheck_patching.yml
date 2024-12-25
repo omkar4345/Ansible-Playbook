@@ -1,0 +1,15 @@
+---
+##################################################################
+### Ansible Playbook to perform patching on RHEl/CentOS Server ###
+##################################################################
+ 
+- name: Check & list Patch Linux system
+  remote_user: ansadm
+  hosts: RHEL7
+  become: true
+  ignore_errors: yes
+
+  tasks:
+    - name: check and list avaiable updates of  patches
+      shell:
+        cmd: yum repolist

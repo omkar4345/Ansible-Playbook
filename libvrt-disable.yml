@@ -1,0 +1,9 @@
+---
+- hosts: EBIZ_TEST_SERVERS
+
+  tasks:
+    - name: Stop libvirtd service
+      shell: systemctl stop libvirtd.service
+
+    - name: Disable libvirtd service
+      shell: systemctl disable libvirtd.service

@@ -1,0 +1,9 @@
+---
+- hosts: OEL7
+  tasks:
+
+  - name: install polkit package on the servers
+    yum:
+      name: polkit*
+      state: latest
+

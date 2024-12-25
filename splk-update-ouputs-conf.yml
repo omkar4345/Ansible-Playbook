@@ -1,0 +1,16 @@
+---
+- hosts: DR
+
+  tasks:
+
+    - name: copy monitoring script
+      copy:
+        src: files/splk-ouputs.conf
+        dest: /opt/splunkforwarder/etc/system/local/outputs.conf
+        owner: splunk
+        group: splunk
+        mode: 0600
+
+
+    - name: Restart to splunk service 
+      command: /opt/splunkforwarder/bin/splunk restart

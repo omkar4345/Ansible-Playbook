@@ -1,0 +1,6 @@
+---
+- hosts: splk-test-env-splk-frwdr
+
+  tasks:
+    - name: splunk service first restart
+      shell: /opt/splunkforwarder/bin/splunk restart --answer-yes --accept-license --no-prompt --seed-user splunk --seed-passwd Splunk@1

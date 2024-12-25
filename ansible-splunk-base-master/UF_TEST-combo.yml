@@ -1,0 +1,20 @@
+---
+# This playbook installs AND configured the Splunk UF.
+# Note: We do not automatically run os-config.yml for a UF OS
+#   but it certainly can be run manually if needed.
+
+- name: Apply prereqs to all nodes
+  hosts: UF_TEST
+  gather_facts: no
+  roles:
+    - prereqs
+
+- name: Install Splunk Universal Forwarder
+  hosts: UF_TEST
+  roles:
+    - uf-install
+
+- name: Configure Splunk Universal Forwarder
+  hosts: UF_TEST
+  roles:
+    - UF-Config_my

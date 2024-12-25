@@ -1,0 +1,110 @@
+---
+ - hosts: DCPOPSLINMRTG01
+   tasks:
+
+    - name: "Disable service autofs"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - autofs
+      tags:
+        - service_autofs_disabled
+        - medium
+        - CCE-27498-5
+
+    - name: "Ensure rsyslog is installed"
+      package:
+        name="{{item}}"
+        state=present
+      with_items:
+        - rsyslog
+      tags:
+        - package_rsyslog_installed
+        - medium
+        - CCE-80187-8
+
+    - name: "Enable service rsyslog"
+      service:
+        name="{{item}}"
+        enabled="yes"
+        state="started"
+      with_items:
+        - rsyslog
+      tags:
+        - service_rsyslog_enabled
+        - medium
+        - CCE-80188-6
+
+    - name: "Disable service abrtd"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - abrtd
+      tags:
+        - service_abrtd_disabled
+        - low
+        - CCE-26872-2
+
+    - name: "Disable service ntpdate"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - ntpdate
+      tags:
+        - service_ntpdate_disabled
+        - low
+        - CCE-80262-9
+
+    - name: "Disable service oddjobd"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - oddjobd
+      tags:
+        - service_oddjobd_disabled
+        - low
+        - CCE-80263-7
+
+    - name: "Disable service qpidd"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - qpidd
+      tags:
+        - service_qpidd_disabled
+        - low
+        - CCE-80266-0
+
+    - name: "Disable service rdisc"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - rdisc
+      tags:
+        - service_rdisc_disabled
+        - low
+        - CCE-80268-6
+
+    - name: "Disable service atd"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - atd
+      tags:
+        - service_atd_disabled
+        - low
+        - CCE-80345-2

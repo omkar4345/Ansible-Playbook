@@ -1,0 +1,32 @@
+---
+- hosts: drpebizdbs01
+
+  tasks:
+    - name: copying SPLUNK_FORWARDER rpm file from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/splunkforwarder-8.1.5-9c0c082e4596-linux-2.6-x86_64.rpm
+        dest: /tmp/splunkforwarder-8.1.5-9c0c082e4596-linux-2.6-x86_64.rpm
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: update SPLUNK_FORWARDER package on the servers
+      yum:
+        name: /tmp/splunkforwarder-8.1.5-9c0c082e4596-linux-2.6-x86_64.rpm
+        state: present
+    
+    - name: Copy directory with owner and permissions
+      ansible.builtin.copy:
+        src: files/moe_all_deploymentclient
+        dest: /opt/splunkforwarder/etc/apps/
+        owner: splunk
+        group: splunk
+        mode: '0755'
+
+    - name: allow splunk id to read /var/log dir
+      shell: setfacl -R -m u:splunk:r-x /var/log
+
+    - name: splunk service first restart
+      shell: /opt/splunkforwarder/bin/splunk restart --answer-yes --accept-license --no-prompt
+      become: true
+      become_user: splunk

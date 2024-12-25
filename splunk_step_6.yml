@@ -1,0 +1,6 @@
+---
+- hosts: OEL7
+
+  tasks:
+    - name: splunk service final restart
+      shell: /opt/splunkforwarder/bin/splunk restart

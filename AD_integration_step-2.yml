@@ -1,0 +1,8 @@
+---
+- hosts: RHEL7
+
+
+  tasks:
+    - name: Linux server joining to AD
+      shell: echo $"xlhi-(?Rq9wH" | realm join --user=svc_linux_dj@secedu.qa secedu.qa
+

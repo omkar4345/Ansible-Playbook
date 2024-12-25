@@ -1,0 +1,12 @@
+---
+ - hosts: RHEL7
+
+   tasks:
+   - name: copy ADservers details in target servers
+     copy:
+       src: files/adserver.txt
+       dest: /tmp
+       mode: 0755
+
+   - name: Add AD servers names in /etc/hosts files
+     shell: cat /tmp/adserver.txt >> /etc/hosts

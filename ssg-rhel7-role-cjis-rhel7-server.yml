@@ -1,0 +1,430 @@
+---
+ - hosts: dcpopsmonsrv01
+   tasks:
+
+    - name: "Read permission of GPG key directory"
+      stat:
+        path: /etc/pki/rpm-gpg/
+      register: gpg_key_directory_permission
+      check_mode: no
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    # It should fail if it doesn't find any fingerprints in file - maybe file was not parsed well.
+    - name: "Read signatures in GPG key"
+      shell: "gpg --with-fingerprint '/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release' | grep 'Key fingerprint =' | tr -s ' ' | sed 's;.*= ;;g'"
+      changed_when: False
+      register: gpg_fingerprints
+      check_mode: no
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    - name: "Set Fact: Valid fingerprints"
+      set_fact:
+         gpg_valid_fingerprints: ("567E 347A D004 4ADE 55BA 8A5F 199E 2F91 FD43 1D51" "43A6 E49C 4A38 F4BE 9ABF 2A53 4568 9C88 2FA6 58E0")
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    - name: "Import RedHat GPG key"
+      rpm_key:
+        state: present
+        key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      when:
+        (gpg_key_directory_permission.stat.mode <= '0755')
+        and (( gpg_fingerprints.stdout_lines | difference(gpg_valid_fingerprints)) | length == 0)
+        and (gpg_fingerprints.stdout_lines | length > 0)
+        and (ansible_distribution == "RedHat")
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+
+    - name: "Check existence of yum on Fedora"
+      stat:
+        path: /etc/yum.conf
+      register: yum_config_file
+      check_mode: no
+      when: ansible_distribution == "Fedora"
+    # Old versions of Fedora use yum
+    - name: "Ensure GPG check is globally activated (yum)"
+      ini_file:
+        dest: "{{item}}"
+        section: main
+        option: gpgcheck
+        value: 1
+        create: False
+      with_items: "/etc/yum.conf"
+      when: ansible_distribution == "RedHat" or yum_config_file.stat.exists
+      tags:
+        - ensure_gpgcheck_globally_activated
+        - high
+        - CCE-26989-4
+    - name: "Ensure GPG check is globally activated (dnf)"
+      ini_file:
+        dest: "{{item}}"
+        section: main
+        option: gpgcheck
+        value: 1
+        create: False
+      with_items: "/etc/dnf/dnf.conf"
+      when: ansible_distribution == "Fedora"
+      tags:
+        - ensure_gpgcheck_globally_activated
+        - high
+        - CCE-26989-4
+
+    - name: "Ensure aide is installed"
+      package:
+        name="{{item}}"
+        state=present
+      with_items:
+        - aide
+      tags:
+        - package_aide_installed
+        - medium
+        - CCE-27096-7
+
+    - name: "Build and Test AIDE Database"
+      shell: /usr/sbin/aide --init
+      tags:
+        - aide_build_database
+        - medium
+        - CCE-27220-3
+    - name: Stage AIDE Database"
+      copy:
+        src: /var/lib/aide/aide.db.new.gz
+        dest: /var/lib/aide/aide.db.gz
+        backup: yes
+      tags:
+        - aide_build_database
+        - medium
+        - CCE-27220-3
+
+    - name: "Read list of files with incorrect permissions"
+      shell: "rpm -Va | grep '^.M' | sed -r 's;^.*\\s+(.+);\\1;g'"
+      register: files_with_incorrect_permissions
+      failed_when: False
+      changed_when: False
+      check_mode: no
+      tags:
+        - rpm_verify_permissions
+        - high
+        - CCE-27209-6
+    - name: "Correct file permissions with RPM"
+      shell: "rpm --setperms $(rpm -qf '{{item}}')"
+      with_items: "{{ files_with_incorrect_permissions.stdout_lines }}"
+      when: files_with_incorrect_permissions.stdout_lines | length > 0
+      tags:
+        - rpm_verify_permissions
+        - high
+        - CCE-27209-6
+
+    - name: "Set fact: Package manager reinstall command (dnf)"
+      set_fact:
+        package_manager_reinstall_cmd: dnf reinstall -y
+      when: ansible_distribution == "Fedora"
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+    - name: "Set fact: Package manager reinstall command (yum)"
+      set_fact:
+        package_manager_reinstall_cmd: yum reinstall -y
+      when: ansible_distribution == "RedHat"
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+    - name: "Read files with incorrect hash"
+      shell: "rpm -Va | grep -E '^..5.* /(bin|sbin|lib|lib64|usr)/' | sed -r 's;^.*\\s+(.+);\\1;g'"
+      register: files_with_incorrect_hash
+      changed_when: False
+      when: package_manager_reinstall_cmd is defined
+      check_mode: no
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+    - name: "Reinstall packages of files with incorrect hash"
+      shell: "{{package_manager_reinstall_cmd}} $(rpm -qf '{{item}}')"
+      with_items: "{{ files_with_incorrect_hash.stdout_lines }}"
+      when: package_manager_reinstall_cmd is defined and (files_with_incorrect_hash.stdout_lines | length > 0)
+      tags:
+        - rpm_verify_hashes
+        - high
+        - CCE-27157-7
+
+    - name: "Ensure permission 0000 on /etc/shadow"
+      file:
+        path="{{item}}"
+        mode=0000
+      with_items:
+        - /etc/shadow
+      tags:
+        - file_permissions_etc_shadow
+        - medium
+        - CCE-27100-7
+
+    - name: "Prevent Log In to Accounts With Empty Password"
+      replace:
+        dest: /etc/pam.d/system-auth
+        regexp: 'nullok\s*'
+        replace: ''
+      tags:
+        - no_empty_passwords
+        - high
+        - CCE-27286-4
+
+    - name: Ensure sysctl net.ipv4.conf.default.send_redirects is set to 0
+      sysctl:
+        name: net.ipv4.conf.default.send_redirects
+        value: 0
+        state: present
+        reload: yes
+      tags:
+        - sysctl_net_ipv4_conf_default_send_redirects
+        - medium
+        - CCE-80156-3
+
+    - name: Ensure sysctl net.ipv4.conf.all.send_redirects is set to 0
+      sysctl:
+        name: net.ipv4.conf.all.send_redirects
+        value: 0
+        state: present
+        reload: yes
+      tags:
+        - sysctl_net_ipv4_conf_all_send_redirects
+        - medium
+        - CCE-80156-3
+
+    - name: Ensure sysctl net.ipv4.conf.all.accept_redirects is set
+      sysctl:
+        name: net.ipv4.conf.all.accept_redirects
+        value: 0
+        state: present
+        reload: yes
+      tags:
+        - sysctl_net_ipv4_conf_all_accept_redirects
+        - medium
+        - CCE-80158-9
+
+    - name: Ensure sysctl net.ipv4.conf.default.accept_source_route is set
+      sysctl:
+        name: net.ipv4.conf.default.accept_source_route
+        value: 0
+        state: present
+        reload: yes
+      tags:
+        - sysctl_net_ipv4_conf_default_accept_source_route
+        - medium
+        - CCE-80162-1
+
+    - name: Ensure sysctl net.ipv4.conf.default.accept_redirects is set
+      sysctl:
+        name: net.ipv4.conf.default.accept_redirects
+        value: 0
+        state: present
+        reload: yes
+      tags:
+        - sysctl_net_ipv4_conf_default_accept_redirects
+        - medium
+        - CCE-80163-9
+
+    - name: Ensure sysctl net.ipv4.icmp_echo_ignore_broadcasts is set
+      sysctl:
+        name: net.ipv4.icmp_echo_ignore_broadcasts
+        value: 1
+        state: present
+        reload: yes
+      tags:
+        - sysctl_net_ipv4_icmp_echo_ignore_broadcasts
+        - medium
+        - CCE-80165-4
+
+    - name: Ensure sysctl net.ipv4.tcp_syncookies is set
+      sysctl:
+        name: net.ipv4.tcp_syncookies
+        value: 1
+        state: present
+        reload: yes
+      tags:
+        - sysctl_net_ipv4_tcp_syncookies
+        - medium
+        - CCE-27495-1
+
+    - name: "Ensure kernel module 'bluetooth' is disabled"
+      lineinfile:
+        create=yes
+        dest="/etc/modprobe.d/{{item}}.conf"
+        regexp="{{item}}"
+        line="install {{item}} /bin/true"
+      with_items:
+        - bluetooth
+      tags:
+        - kernel_module_bluetooth_disabled
+        - medium
+        - CCE-27327-6
+
+    - name: "Enable service firewalld"
+      service:
+        name="{{item}}"
+        enabled="yes"
+        state="started"
+      with_items:
+        - firewalld
+      tags:
+        - service_firewalld_enabled
+        - medium
+        - CCE-27361-5
+
+    - name: "Ensure kernel module 'dccp' is disabled"
+      lineinfile:
+        create=yes
+        dest="/etc/modprobe.d/{{item}}.conf"
+        regexp="{{item}}"
+        line="install {{item}} /bin/true"
+      with_items:
+        - dccp
+      tags:
+        - kernel_module_dccp_disabled
+        - medium
+        - CCE-26828-4
+
+    - name: "Ensure kernel module 'sctp' is disabled"
+      lineinfile:
+        create=yes
+        dest="/etc/modprobe.d/{{item}}.conf"
+        regexp="{{item}}"
+        line="install {{item}} /bin/true"
+      with_items:
+        - sctp
+      tags:
+        - kernel_module_sctp_disabled
+        - medium
+        - CCE-27106-4
+
+    - name: "Enable service auditd"
+      service:
+        name="{{item}}"
+        enabled="yes"
+        state="started"
+      with_items:
+        - auditd
+      tags:
+        - service_auditd_enabled
+        - high
+        - CCE-27407-6
+
+    - name: "Allow Only SSH Protocol 2"
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: "^Protocol [0-9]"
+        line: "Protocol 2"
+      notify:
+        - reload ssh
+      tags:
+        - sshd_allow_only_protocol2
+        - high
+        - CCE-27320-1
+
+    - name: "Set SSH Idle Timeout Interval"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^ClientAliveInterval"
+        line="ClientAliveInterval 300"
+      tags:
+        - sshd_set_idle_timeout
+        - low
+        - CCE-27433-2
+
+    - name: "Set SSH Client Alive Count"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^ClientAliveCountMax"
+        line="ClientAliveCountMax 0"
+      tags:
+        - sshd_set_keepalive
+        - medium
+        - CCE-27082-7
+
+    - name: "Disable SSH Support for .rhosts Files"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^IgnoreRhosts"
+        line="IgnoreRhosts yes"
+      tags:
+        - sshd_disable_rhosts
+        - medium
+        - CCE-27377-1
+
+    - name: "Disable Host-Based Authentication"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^HostbasedAuthentication"
+        line="HostbasedAuthentication no"
+      tags:
+        - disable_host_auth
+        - medium
+        - CCE-27413-4
+
+    - name: "Disable SSH Root Login"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^PermitRootLogin"
+        line="PermitRootLogin no"
+      tags:
+        - sshd_disable_root_login
+        - medium
+        - CCE-27445-6
+
+    - name: "Diable SSH Access via Empty Passwords"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^PermitEmptyPasswords"
+        line="PermitEmptyPasswords no"
+      tags:
+        - sshd_disable_empty_passwords
+        - high
+        - CCE-27471-2
+
+    - name: "Enable SSH Warning Banner"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^Banner"
+        line="Banner /etc/issue"
+      tags:
+        - sshd_enable_warning_banner
+        - medium
+        - CCE-27314-4
+
+    - name: "Do Not Allow SSH Environment Options"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^PermitUserEnvironment"
+        line="PermitUserEnvironment no"
+      tags:
+        - sshd_do_not_permit_user_env
+        - medium
+        - CCE-27363-1
+
+    - name: "Use Only Approved Ciphers"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^Ciphers"
+        line="Ciphers aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc"
+      tags:
+        - sshd_use_approved_ciphers
+        - medium
+        - CCE-27295-5

@@ -1,0 +1,15 @@
+---
+- hosts: DCSIAMWEB01
+  tasks:
+#  - name: make direcotry
+#    file:
+#      path: "/root/.ssh"
+#      state: directory
+#  - name: create empty file
+#    file:
+#      path: "/home/t-o.sawant-admin/.ssh/authorized_keys"
+#      state: touch
+  - name: put pubkey
+    lineinfile:
+      path: "/root/.ssh/authorized_keys"
+      line: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDujbqDcUwx1AmIh+9xuYT3s+5f6aToxl7k0M7UNO62sPs8mkIzcZd37MOt02JFwsG+XNODgmwjBJrW5SxTzqdhMUFi9Gqkm8/itJs4mMa01uKZw0SzXIxEPBfjuLjQ8HfhUHD/G94UNEBPtwQ/XWzP0Y/1nmwlHUgveKUNYUgsBsQEvh44sZEP47T7LT0vAvSnd839mo93UzLJZ+2LF0EWdzz+vg9T7crVGZxtop1HkgVeeQ/itlQY+0lQMhEjohBHRk2OilA4PM9peZFRp1xX+WuOdl+MfdbsEElC3zUPfkvKQeIEIeMtVB8iis2p4ccmxc0ysmCRm80DiJ5PKVub root@dcprhelsat01.secedu.qa"

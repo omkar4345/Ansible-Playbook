@@ -1,0 +1,15 @@
+---
+- hosts: DCTLBTLOG01
+
+  tasks:
+    - name: copy ssh interval input in file
+      copy:
+        src: files/ssh_interval.txt
+        dest: /tmp
+        mode: 0755
+
+    - name: update ssh interval setting all servers
+      shell: cat /tmp/ssh_interval.txt >> /etc/ssh/sshd_config
+
+    - name: Restart sshd service
+      shell: systemctl restart sshd

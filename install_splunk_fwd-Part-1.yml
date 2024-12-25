@@ -1,0 +1,58 @@
+---
+- hosts: RHEL7
+
+
+  tasks:
+    - name: remove SPLUNK_FORWARDER package from the server
+      yum:
+        name: splunkforwarder
+        state: removed
+
+    - name: copying SPLUNK_FORWARDER rpm file from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/splunkforwarder-8.1.0-f57c09e87251-linux-2.6-x86_64.rpm
+        dest: /tmp/splunkforwarder-8.1.0-f57c09e87251-linux-2.6-x86_64.rpm
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: copying SPLUNK_FORWARDER rpm file from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/splunkFWDR_install.sh
+        dest: /tmp/splunkFWDR_install.sh
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: splunk user create for splunk UF
+      user:
+        name: splunk
+        comment: "splunk ID for splunk-forwarder"
+
+
+    - name: install SPLUNK_FORWARDER package on the servers
+      yum: 
+        name: /tmp/splunkforwarder-8.1.0-f57c09e87251-linux-2.6-x86_64.rpm
+        state: present
+
+    - name: splunk service first restart
+      shell: /opt/splunkforwarder/bin/splunk restart --answer-yes -user splunk --accept-license
+
+    - name: Accepting Splunk license
+      shell: /opt/splunkforwarder/bin/splunk enable boot-start --answer-yes -user splunk --accept-license
+
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index1.secedu.qa:9997 -auth t-o.sawant-admin@education.qa:betnmUIj
+
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index2.secedu.qa:9997 -auth t-o.sawant-admin@education.qa:betnmUIj
+
+    - name: connect to splunk indexer server
+      shell: /opt/splunkforwarder/bin/splunk add forward-server splk-index3.secedu.qa:9997 -auth t-o.sawant-admin@education.qa:betnmUIj
+
+    - name: path which need to be monitored
+      shell: /opt/splunkforwarder/bin/splunk add monitor /var/log/ -index main -sourcetype %ALL%
+
+    - name: splunk service final restart
+      shell: /opt/splunkforwarder/bin/splunk restart
+

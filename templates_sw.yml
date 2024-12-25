@@ -1,0 +1,51 @@
+---
+- hosts: templates
+
+
+  tasks:
+    - name: copying SPLUNK_FORWARDER rpm file from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/splunkforwarder-8.0.5-a1a6394cc5ae-linux-2.6-x86_64.rpm
+        dest: /tmp/splunkforwarder-8.0.5-a1a6394cc5ae-linux-2.6-x86_64.rpm
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: install SPLUNK_FORWARDER package on the servers
+      shell: rpm -ivh /tmp/splunkforwarder-8.0.5-a1a6394cc5ae-linux-2.6-x86_64.rpm
+
+    - name: copying install script file for SPLUNK_FORWARDER from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/splunkFWDR_install.sh
+        dest: /tmp/splunkFWDR_install.sh
+        owner: root
+        group: root
+        mode: 0755
+
+  tasks:
+    - name: copying Avamar rpm file from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: files/AvamarClient-linux-sles11-x86_64-19.3.100-149.rpm
+        dest: /tmp/
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: install Avamar package on the servers
+      shell: rpm -ivh /tmp/AvamarClient-linux-sles11-x86_64-19.3.100-149.rpm
+
+#    - name: Start avamar service
+#      shell: systemctl restart avagent
+
+  tasks:
+    - name: copying Symantec installer file from DCPOPSAUTOVM01 to target machines
+      copy:
+        src: /etc/ansible/task-list/files/SymantecEndpointProtection
+        dest: /tmp/
+        directory_mode: yes
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: install Symantec on the servers
+      shell: sh /tmp/SymantecEndpointProtection/install.sh -i

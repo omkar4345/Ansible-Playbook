@@ -1,0 +1,6 @@
+---
+- hosts: DCPNESSUSVS01
+
+  tasks:
+    - name: path which need to be monitored
+      shell: /opt/splunkforwarder/bin/splunk add monitor /var/log/ -index main -sourcetype %ALL%

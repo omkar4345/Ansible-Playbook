@@ -1,0 +1,6 @@
+---
+- hosts: DCPNESSUSVS01
+
+  tasks:
+    - name: Enbale splunk service in booting time
+      shell: /opt/splunkforwarder/bin/splunk enable boot-start

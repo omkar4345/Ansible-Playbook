@@ -1,0 +1,22 @@
+
+PLAY [MY_SERVERS] **************************************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [DCPOPSMONSRV01]
+[WARNING]: Platform linux on host DCPORAREPOSRV01 is using the discovered
+Python interpreter at /usr/bin/python, but future installation of another
+Python interpreter could change this. See https://docs.ansible.com/ansible/2.9/
+reference_appendices/interpreter_discovery.html for more information.
+ok: [DCPORAREPOSRV01]
+ok: [DCPOPSLINMRTG01]
+ok: [splk-search5]
+ok: [DCPOPSAUTOVM01]
+
+TASK [Starting splunk service and accepting license] ***************************
+changed: [DCPOPSMONSRV01]
+changed: [DCPOPSAUTOVM01]
+fatal: [DCPOPSLINMRTG01]: UNREACHABLE! => {"changed": false, "msg": "Failed to connect to the host via ssh: Shared connection to dcpopslinmrtg01 closed.", "unreachable": true}
+fatal: [splk-search5]: UNREACHABLE! => {"changed": false, "msg": "Failed to connect to the host via ssh: Shared connection to splk-search5 closed.", "unreachable": true}
+fatal: [DCPORAREPOSRV01]: UNREACHABLE! => {"changed": false, "msg": "Failed to connect to the host via ssh: Shared connection to dcporareposrv01 closed.", "unreachable": true}
+
+TASK [connect to splunk indexer server] ****************************************

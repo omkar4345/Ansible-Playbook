@@ -1,0 +1,15 @@
+---
+- hosts: splk-search5
+
+  tasks:
+
+  - name: Add new user on all splunk servers
+    user:
+      name: test
+      create_home: yes
+      comment: "user created through ansible for testing"
+      password: "{{ 'password' | password_hash('sha512') }}"
+      update_password: on_create
+
+  - name: give sudo rights to "test" user
+    shell: echo "test ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers

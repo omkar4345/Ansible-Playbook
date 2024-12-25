@@ -1,0 +1,9 @@
+---
+ - hosts: RHEL7
+
+   tasks:
+   - name: copy sssd.conf file on targetted servers
+     copy:
+       src: files/sssd.conf
+       dest: /etc/sssd/
+       mode: 0600

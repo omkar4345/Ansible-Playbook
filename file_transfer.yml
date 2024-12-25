@@ -1,0 +1,10 @@
+---
+ - hosts: all
+
+   tasks:
+   - name: copy file from local host to remote host (absolute path)
+     copy:
+       src: files/download.sh
+       dest: /tmp
+       mode: 0755
+

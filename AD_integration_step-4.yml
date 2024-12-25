@@ -1,0 +1,7 @@
+---
+- hosts: RHEL7
+
+
+  tasks:
+    - name: restart sssd service
+      shell: systemctl restart sssd

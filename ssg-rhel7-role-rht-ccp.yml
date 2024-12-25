@@ -1,0 +1,459 @@
+---
+ - hosts: localhost # set required host
+   tasks:
+
+    - name: "Read permission of GPG key directory"
+      stat:
+        path: /etc/pki/rpm-gpg/
+      register: gpg_key_directory_permission
+      check_mode: no
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    # It should fail if it doesn't find any fingerprints in file - maybe file was not parsed well.
+    - name: "Read signatures in GPG key"
+      shell: "gpg --with-fingerprint '/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release' | grep 'Key fingerprint =' | tr -s ' ' | sed 's;.*= ;;g'"
+      changed_when: False
+      register: gpg_fingerprints
+      check_mode: no
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    - name: "Set Fact: Valid fingerprints"
+      set_fact:
+         gpg_valid_fingerprints: ("567E 347A D004 4ADE 55BA 8A5F 199E 2F91 FD43 1D51" "43A6 E49C 4A38 F4BE 9ABF 2A53 4568 9C88 2FA6 58E0")
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+    - name: "Import RedHat GPG key"
+      rpm_key:
+        state: present
+        key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      when:
+        (gpg_key_directory_permission.stat.mode <= '0755')
+        and (( gpg_fingerprints.stdout_lines | difference(gpg_valid_fingerprints)) | length == 0)
+        and (gpg_fingerprints.stdout_lines | length > 0)
+        and (ansible_distribution == "RedHat")
+      tags:
+        - ensure_redhat_gpgkey_installed
+        - high
+        - CCE-26957-1
+
+    - name: "Check existence of yum on Fedora"
+      stat:
+        path: /etc/yum.conf
+      register: yum_config_file
+      check_mode: no
+      when: ansible_distribution == "Fedora"
+    # Old versions of Fedora use yum
+    - name: "Ensure GPG check is globally activated (yum)"
+      ini_file:
+        dest: "{{item}}"
+        section: main
+        option: gpgcheck
+        value: 1
+        create: False
+      with_items: "/etc/yum.conf"
+      when: ansible_distribution == "RedHat" or yum_config_file.stat.exists
+      tags:
+        - ensure_gpgcheck_globally_activated
+        - high
+        - CCE-26989-4
+    - name: "Ensure GPG check is globally activated (dnf)"
+      ini_file:
+        dest: "{{item}}"
+        section: main
+        option: gpgcheck
+        value: 1
+        create: False
+      with_items: "/etc/dnf/dnf.conf"
+      when: ansible_distribution == "Fedora"
+      tags:
+        - ensure_gpgcheck_globally_activated
+        - high
+        - CCE-26989-4
+
+    - name: "Ensure aide is installed"
+      package:
+        name="{{item}}"
+        state=present
+      with_items:
+        - aide
+      tags:
+        - package_aide_installed
+        - medium
+        - CCE-27096-7
+
+    - name: "Ensure permission 0000 on /etc/shadow"
+      file:
+        path="{{item}}"
+        mode=0000
+      with_items:
+        - /etc/shadow
+      tags:
+        - file_permissions_etc_shadow
+        - medium
+        - CCE-27100-7
+
+    - name: "Read list of world and group writable files in libraries directories"
+      shell: "find /lib /lib64 /usr/lib /usr/lib64 -perm /022 -type f"
+      register: world_writable_library_files
+      changed_when: False
+      failed_when: False
+      check_mode: no
+      tags:
+        - file_permissions_library_dirs
+        - medium
+        - CCE-26966-2
+    - name: "Disable world/group writability to library files"
+      file:
+        path: "{{item}}"
+        mode: "go-w"
+      with_items: "{{ world_writable_library_files.stdout_lines }}"
+      when: world_writable_library_files.stdout_lines | length > 0
+      tags:
+        - file_permissions_library_dirs
+        - medium
+        - CCE-26966-2
+
+    - name: "Read list libraries without root ownership"
+      shell: "find -L /usr/lib /usr/lib64 /lib /lib64 \\! -user root"
+      register: libraries_not_owned_by_root
+      changed_when: False
+      failed_when: False
+      check_mode: no
+      tags:
+        - file_ownership_library_dirs
+        - medium
+        - CCE-26648-6
+    - name: "Set ownership of system libraries to root"
+      file:
+        path: "{{item}}"
+        owner: "root"
+      with_items: "{{ libraries_not_owned_by_root.stdout_lines }}"
+      when: libraries_not_owned_by_root | length > 0
+      tags:
+        - file_ownership_library_dirs
+        - medium
+        - CCE-26648-6
+
+    - name: "Read list of world and group writable system executables"
+      shell: "find /bin /usr/bin /usr/local/bin /sbin /usr/sbin /usr/local/sbin /usr/libexec -perm /022 -type f"
+      register: world_writable_library_files
+      changed_when: False
+      failed_when: False
+      check_mode: no
+      tags:
+        - file_permissions_binary_dirs
+        - medium
+        - CCE-27075-1
+    - name: "Remove world/group writability of system executables"
+      file:
+        path: "{{item}}"
+        mode: "go-w"
+      with_items: "{{ world_writable_library_files.stdout_lines }}"
+      when: world_writable_library_files.stdout_lines | length > 0
+      tags:
+        - file_permissions_binary_dirs
+        - medium
+        - CCE-27075-1
+
+    - name: "Read list of system executables without root ownership"
+      shell: "find /bin/ /usr/bin/ /usr/local/bin/ /sbin/ /usr/sbin/ /usr/local/sbin/ /usr/libexec \\! -user root"
+      register: no_root_system_executables
+      changed_when: False
+      failed_when: False
+      check_mode: no
+      tags:
+        - file_ownership_binary_dirs
+        - medium
+        - CCE-27119-7
+    - name: "Set ownership to root of system executables"
+      file:
+        path: "{{item}}"
+        owner: "root"
+      with_items: "{{ no_root_system_executables.stdout_lines }}"
+      when: no_root_system_executables.stdout_lines | length > 0
+      tags:
+        - file_ownership_binary_dirs
+        - medium
+        - CCE-27119-7
+
+    - name: "Ensure SELinux State is Enforcing (persistent)"
+      selinux:
+        state: enforcing
+      tags:
+        - selinux_state
+        - high
+        - CCE-27334-2
+
+    - name: "Configure SELinux Policy"
+      selinux:
+        policy: targeted
+      tags:
+        - selinux_policytype
+        - high
+        - CCE-27279-9
+
+    - name: "Prevent Log In to Accounts With Empty Password"
+      replace:
+        dest: /etc/pam.d/system-auth
+        regexp: 'nullok\s*'
+        replace: ''
+      tags:
+        - no_empty_passwords
+        - high
+        - CCE-27286-4
+
+    - name: "Ensure PAM variable dcredit is set to -1"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^dcredit"
+        line="dcredit = -1"
+      tags:
+        - accounts_password_pam_dcredit
+        - medium
+        - CCE-27214-6
+
+    - name: "Ensure PAM variable ucredit is set to -2"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^ucredit"
+        line="ucredit = -2"
+      tags:
+        - accounts_password_pam_ucredit
+        - medium
+        - CCE-27200-5
+
+    - name: "Ensure PAM variable ocredit is set to -2"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^ocredit"
+        line="ocredit = -2"
+      tags:
+        - accounts_password_pam_ocredit
+        - medium
+        - CCE-27360-7
+
+    - name: "Ensure PAM variable lcredit is set to -2"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^lcredit"
+        line="lcredit = -2"
+      tags:
+        - accounts_password_pam_lcredit
+        - medium
+        - CCE-27345-8
+
+    - name: "Ensure PAM variable difok is set to 3"
+      lineinfile:
+        create=yes
+        dest="/etc/security/pwquality.conf"
+        regexp="^difok"
+        line="difok = 3"
+      tags:
+        - accounts_password_pam_difok
+        - medium
+        - CCE-26631-2
+
+    - name: "Enable service firewalld"
+      service:
+        name="{{item}}"
+        enabled="yes"
+        state="started"
+      with_items:
+        - firewalld
+      tags:
+        - service_firewalld_enabled
+        - medium
+        - CCE-27361-5
+
+    - name: "Ensure kernel module 'dccp' is disabled"
+      lineinfile:
+        create=yes
+        dest="/etc/modprobe.d/{{item}}.conf"
+        regexp="{{item}}"
+        line="install {{item}} /bin/true"
+      with_items:
+        - dccp
+      tags:
+        - kernel_module_dccp_disabled
+        - medium
+        - CCE-26828-4
+
+    - name: "Ensure kernel module 'sctp' is disabled"
+      lineinfile:
+        create=yes
+        dest="/etc/modprobe.d/{{item}}.conf"
+        regexp="{{item}}"
+        line="install {{item}} /bin/true"
+      with_items:
+        - sctp
+      tags:
+        - kernel_module_sctp_disabled
+        - medium
+        - CCE-27106-4
+
+    - name: "Disable service telnet"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - telnet
+      tags:
+        - service_telnet_disabled
+        - high
+        - CCE-27401-9
+
+    - name: "Ensure telnet-server is removed"
+      package:
+        name="{{item}}"
+        state=absent
+      with_items:
+        - telnet-server
+      tags:
+        - package_telnet-server_removed
+        - high
+        - CCE-27165-0
+
+    - name: "Ensure telnet is removed"
+      package:
+        name="{{item}}"
+        state=absent
+      with_items:
+        - telnet
+      tags:
+        - package_telnet_removed
+        - low
+        - CCE-27305-2
+
+    - name: "Disable service abrtd"
+      service:
+        name="{{item}}"
+        enabled="no"
+        state="stopped"
+      with_items:
+        - abrtd
+      tags:
+        - service_abrtd_disabled
+        - low
+        - CCE-26872-2
+
+    - name: "Allow Only SSH Protocol 2"
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: "^Protocol [0-9]"
+        line: "Protocol 2"
+      notify:
+        - reload ssh
+      tags:
+        - sshd_allow_only_protocol2
+        - high
+        - CCE-27320-1
+
+    - name: "Set SSH Idle Timeout Interval"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^ClientAliveInterval"
+        line="ClientAliveInterval 300"
+      tags:
+        - sshd_set_idle_timeout
+        - low
+        - CCE-27433-2
+
+    - name: "Set SSH Client Alive Count"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^ClientAliveCountMax"
+        line="ClientAliveCountMax 0"
+      tags:
+        - sshd_set_keepalive
+        - medium
+        - CCE-27082-7
+
+    - name: "Disable SSH Support for .rhosts Files"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^IgnoreRhosts"
+        line="IgnoreRhosts yes"
+      tags:
+        - sshd_disable_rhosts
+        - medium
+        - CCE-27377-1
+
+    - name: "Disable Host-Based Authentication"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^HostbasedAuthentication"
+        line="HostbasedAuthentication no"
+      tags:
+        - disable_host_auth
+        - medium
+        - CCE-27413-4
+
+    - name: "Disable SSH Root Login"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^PermitRootLogin"
+        line="PermitRootLogin no"
+      tags:
+        - sshd_disable_root_login
+        - medium
+        - CCE-27445-6
+
+    - name: "Diable SSH Access via Empty Passwords"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^PermitEmptyPasswords"
+        line="PermitEmptyPasswords no"
+      tags:
+        - sshd_disable_empty_passwords
+        - high
+        - CCE-27471-2
+
+    - name: "Enable SSH Warning Banner"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^Banner"
+        line="Banner /etc/issue"
+      tags:
+        - sshd_enable_warning_banner
+        - medium
+        - CCE-27314-4
+
+    - name: "Do Not Allow SSH Environment Options"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^PermitUserEnvironment"
+        line="PermitUserEnvironment no"
+      tags:
+        - sshd_do_not_permit_user_env
+        - medium
+        - CCE-27363-1
+
+    - name: "Use Only Approved Ciphers"
+      lineinfile:
+        create=yes
+        dest="/etc/ssh/sshd_config"
+        regexp="^Ciphers"
+        line="Ciphers aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc"
+      tags:
+        - sshd_use_approved_ciphers
+        - medium
+        - CCE-27295-5
